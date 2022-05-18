@@ -51,9 +51,10 @@ bool Triangulation::triangulation(
     ///       implementation, which also makes testing and debugging easier. You can put your other functions above
     ///       triangulation(), or put them in one or multiple separate files.
 
-    std::cout << "\nTODO: I am going to implement the triangulation() function in the following file:" << std::endl
-              << "\t    - triangulation_method.cpp\n\n";
+//    std::cout << "\nTODO: I am going to implement the triangulation() function in the following file:" << std::endl
+//              << "\t    - triangulation_method.cpp\n\n";
 
+    /*
     std::cout << "[Liangliang]:\n"
                  "\tFeel free to use any provided data structures and functions. For your convenience, the\n"
                  "\tfollowing three files implement basic linear algebra data structures and operations:\n"
@@ -68,7 +69,9 @@ bool Triangulation::triangulation(
                  "\t    - include all the source code (and please do NOT modify the structure of the directories).\n"
                  "\t    - do NOT include the 'build' directory (which contains the intermediate files in a build step).\n"
                  "\t    - make sure your code compiles and can reproduce your results without ANY modification.\n\n" << std::flush;
+    */
 
+    /*
     /// Below are a few examples showing some useful data structures and APIs.
 
     /// define a 2D vector/point
@@ -128,9 +131,14 @@ bool Triangulation::triangulation(
     ///For more functions of Matrix and Vector, please refer to 'matrix.h' and 'vector.h'
 
     // TODO: delete all above example code in your final submission
-
+    */
     //--------------------------------------------------------------------------------------------------------------
     // implementation starts ...
+
+//    double fx, double fy,     /// input: the focal lengths (same for both cameras)
+//    double cx, double cy,     /// input: the principal point (same for both cameras)
+//    const std::vector<Vector2D> &points_0,  /// input: 2D image points in the 1st image.
+//    const std::vector<Vector2D> &points_1,  /// input: 2D image points in the 2nd image.
 
     // TODO: check if the input is valid (always good because you never known how others will call your function).
 
@@ -138,6 +146,96 @@ bool Triangulation::triangulation(
     //      - estimate the fundamental matrix F;
     //      - compute the essential matrix E;
     //      - recover rotation R and t.
+    Matrix33 K(fx, 0, cx, //intrinsic camera matrix K
+               0, fy, cy,
+               0, 0, 1);
+    std::cout << "2D points size:" << points_0.size() << "\n";
+
+    // first estimate:
+    std::vector<double> random_draws = {6, 17, 39, 70, 84, 100, 116, 151};
+    Vector Ran(random_draws);
+
+    // normalisation for point0
+    double sumx=0.0;
+    double sumy=0.0;
+    for (int i = 0; i < random_draws.size(); i++) {
+        sumx=sumx+points_0[Ran[i]][0];
+        sumy=sumy+points_0[Ran[i]][1];
+    }
+    double centerx = sumx/8;
+    double centery = sumy/8;
+
+    Vector DistanceFromCenter(8, 0);
+    double sumdistance=0;
+    for (int i = 0; i < DistanceFromCenter.size(); i++) {
+        double x = points_0[i][0];
+        double y = points_0[i][1];
+        DistanceFromCenter[i]= sqrt((centerx-x)*(centerx-x)+(centery-y)*(centery-y));
+        sumdistance=sumdistance+DistanceFromCenter[i];
+    }
+
+    double Avgdistance=sumdistance/DistanceFromCenter.size();
+    double scale=sqrt(2)/Avgdistance;
+    Vector NormalizedDistance=DistanceFromCenter*scale;
+
+    // normalisation for point1
+    double sumx1=0.0;
+    double sumy1=0.0;
+    for (int i = 0; i < random_draws.size(); i++) {
+        sumx1=sumx1+points_1[Ran[i]][0];
+        sumy1=sumy1+points_1[Ran[i]][1];
+    }
+    double centerx1 = sumx1/8;
+    double centery1 = sumy1/8;
+
+    Vector DistanceFromCenter1(8, 0);
+    double sumdistance1=0;
+    for (int i = 0; i < DistanceFromCenter1.size(); i++) {
+        double x1 = points_1[i][0];
+        double y1 = points_1[i][1];
+        DistanceFromCenter1[i]= sqrt((centerx1-x1)*(centerx1-x1)+(centery1-y1)*(centery1-y1));
+        sumdistance1=sumdistance1+DistanceFromCenter1[i];
+    }
+
+    double Avgdistance1=sumdistance1/DistanceFromCenter1.size();
+    double scale1=sqrt(2)/Avgdistance1;
+    Vector NormalizedDistance1=DistanceFromCenter1*scale1;
+
+//    for (int i = 0; i<NormalizedDistance1.size(); i++) {
+//        std::cout << NormalizedDistance1[i] << "\t";
+//    }
+//    std::cout << "\n";
+
+
+    Matrix W(8, 9, 0.0);
+    for (int i = 0; i < W.rows(); i++) {
+//        W.set_row(i,{points_0[Ran[i]][0]*points_1[Ran[i]][0], points_0[Ran[i]][1]*points_1[Ran[i]][0], points_1[Ran[i]][0], points_0[Ran[i]][0]*points_1[Ran[i]][1], points_0[Ran[i]][1]*points_1[Ran[i]][1], points_1[Ran[i]][1], points_0[Ran[i]][0], points_0[Ran[i]][1],1});
+        W.set_row(i,{NormalizedDistance[i]*NormalizedDistance1[i], NormalizedDistance[i]*NormalizedDistance1[i], NormalizedDistance1[i], NormalizedDistance[i]*NormalizedDistance1[i], NormalizedDistance[i]*NormalizedDistance1[i], NormalizedDistance1[i], NormalizedDistance[i], NormalizedDistance[i],1});
+    }
+
+//    std::cout << W << "\n";
+
+    // Compute the SVD decomposition of A
+
+    /// matrix-vector product
+    int mm = W.rows(); int nn = W.cols();
+    Matrix U(mm, mm, 0.0);   // initialized with 0s
+    Matrix S(mm, nn, 0.0);   // Sigma matrix
+    Matrix V(nn, nn, 0.0);   // initialized with 0s
+
+    svd_decompose(W, U, S, V);
+    std::cout << "my matrix S: " << S;
+    //Sima= U minus sigma 3 into matrix
+    std::vector<double> myvector = {S[0][0], 0, 0, S[1][1]};
+    Matrix Sigma(2,2, myvector);
+    std::cout << "my matrix Simga: " << Sigma;
+    Matrix F = U * S * transpose(V);
+    std::cout << "my matrix F: " << F;
+
+    Matrix E = transpose(K)*F*K;
+    std::cout << "my matrix E: " << E;
+    //    // check if R is valid
+    //    std::cout << "R.T*R " << R * transpose(R) << "\n";
 
     // TODO: Reconstruct 3D points. The main task is
     //      - triangulate a pair of image points (i.e., compute the 3D coordinates for each corresponding point pair)
