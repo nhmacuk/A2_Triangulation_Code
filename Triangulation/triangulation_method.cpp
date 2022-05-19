@@ -206,11 +206,14 @@ bool Triangulation::triangulation(
 //    }
 //    std::cout << "\n";
 
-
+    // Create W
     Matrix W(8, 9, 0.0);
     for (int i = 0; i < W.rows(); i++) {
+        W.set_row(i,{new_points_0[Ran[i]][0]*new_points_1[Ran[i]][0], new_points_0[Ran[i]][1]*new_points_1[Ran[i]][0], new_points_1[Ran[i]][0], new_points_0[Ran[i]][0]*new_points_1[Ran[i]][1], new_points_0[Ran[i]][1]*new_points_1[Ran[i]][1], new_points_1[Ran[i]][1], new_points_0[Ran[i]][0], new_points_0[Ran[i]][1],1});
+
 //        W.set_row(i,{points_0[Ran[i]][0]*points_1[Ran[i]][0], points_0[Ran[i]][1]*points_1[Ran[i]][0], points_1[Ran[i]][0], points_0[Ran[i]][0]*points_1[Ran[i]][1], points_0[Ran[i]][1]*points_1[Ran[i]][1], points_1[Ran[i]][1], points_0[Ran[i]][0], points_0[Ran[i]][1],1});
-        W.set_row(i,{NormalizedDistance[i]*NormalizedDistance1[i], NormalizedDistance[i]*NormalizedDistance1[i], NormalizedDistance1[i], NormalizedDistance[i]*NormalizedDistance1[i], NormalizedDistance[i]*NormalizedDistance1[i], NormalizedDistance1[i], NormalizedDistance[i], NormalizedDistance[i],1});
+
+//        W.set_row(i,{NormalizedDistance[i]*NormalizedDistance1[i], NormalizedDistance[i]*NormalizedDistance1[i], NormalizedDistance1[i], NormalizedDistance[i]*NormalizedDistance1[i], NormalizedDistance[i]*NormalizedDistance1[i], NormalizedDistance1[i], NormalizedDistance[i], NormalizedDistance[i],1});
     }
 
 //    std::cout << W << "\n";
@@ -225,17 +228,44 @@ bool Triangulation::triangulation(
 
     svd_decompose(W, U, S, V);
     std::cout << "my matrix S: " << S;
-    //Sima= U minus sigma 3 into matrix
-    std::vector<double> myvector = {S[0][0], 0, 0, S[1][1]};
-    Matrix Sigma(2,2, myvector);
-    std::cout << "my matrix Simga: " << Sigma;
-    Matrix F = U * S * transpose(V);
-    std::cout << "my matrix F: " << F;
+
+    // F^
+    Vector F_hat_vector= (V.get_column(V.cols() - 1));
+
+    // F from 1x9 to 3x3
+    Matrix F_hat(3,3, {F_hat_vector[0], F_hat_vector[1], F_hat_vector[2],
+                       F_hat_vector[3], F_hat_vector[4], F_hat_vector[5],
+                       F_hat_vector[6], F_hat_vector[7], F_hat_vector[8],});
+
+    mm = F_hat.rows(); nn = F_hat.cols();
+    Matrix U1(mm, mm, 0.0);   // initialized with 0s
+    Matrix S1(mm, nn, 0.0);   // Sigma matrix
+    Matrix V1(nn, nn, 0.0);   // initialized with 0s
+
+    svd_decompose(F_hat, U1, S1, V1);
+
+    std::cout << "my matrix S1: " << S1;
+
+//     Create Sigma
+//    std::vector<double> myvector = {S1[0][0], 0, 0, 0, S1[1][1], 0, 0, 0, 0};
+//    Matrix Sigma(3,3, myvector);
+//    std::cout << "my matrix Simga: " << Sigma;
+
+// Create F
+//    Matrix F;
+//    F = U1 * Sigma * transpose(V1);  //This is F_g
+
+    //  denormalize
+    Matrix F;
+    F = T1.transpose()*F_hat*T;
+    std::cout << "my matrix F: " << F; //no no no I was wrong
 
     Matrix E = transpose(K)*F*K;
     std::cout << "my matrix E: " << E;
     //    // check if R is valid
     //    std::cout << "R.T*R " << R * transpose(R) << "\n";
+
+
 
     // TODO: Reconstruct 3D points. The main task is
     //      - triangulate a pair of image points (i.e., compute the 3D coordinates for each corresponding point pair)
